@@ -14,6 +14,34 @@ Mpc_planner::~Mpc_planner()
 void Mpc_planner::init() {
    real_allocated = false; 
    first_run_ = true;
+
+   traj_init_.setZero();
+   traj_all_.setZero();
+   x_0_.setZero();
+   root_euler_.setZero();
+   root_position_.setZero();
+   root_angular_velocity_in_world_.setZero();
+   root_linear_velocity_in_world_.setZero();
+   rotation_matrix_body_to_world_.setZero();
+   foot_position_in_body_.setZero();
+   I_body_.setZero();
+   I_world_.setZero();
+   I_world_inv_.setZero();
+   R_yaw_.setZero();
+    A_.setZero();
+   B_.setZero();
+   r_com_to_foot_.setZero();
+   com_in_body_.setZero();
+   A_qp_.setZero();
+   B_qp_.setZero();
+
+   H_matrix_.setZero();
+   g_matrix_.setZero();
+   A_matrix_.setZero();
+   ubA_matrix_.setZero();
+   lbA_matrix_.setZero();
+   S_.setZero();
+   weights_.setZero();
 }
 
 // NOTE：参数传递分为两部分：1）用于构建x_dot = A*x+Bu的参数；2）用于设置MPC的参数
@@ -182,7 +210,7 @@ void Mpc_planner::run() {
   qpOASES::Options op;
   op.setToMPC();
 //   op.setToReliable();
-  op.printLevel = qpOASES::PL_DEBUG_ITER;
+  op.printLevel = qpOASES::PL_LOW;
   problem_red.setOptions(op);
   qpOASES::real_t cpu_time{0.01};
   qpOASES::int_t nWSR = 1000;
