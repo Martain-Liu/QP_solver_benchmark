@@ -11,7 +11,10 @@ Mpc_planner::~Mpc_planner()
 {
 }
 
-void Mpc_planner::init() { real_allocated = false; }
+void Mpc_planner::init() {
+   real_allocated = false; 
+   first_run_ = true;
+}
 
 // NOTE：参数传递分为两部分：1）用于构建x_dot = A*x+Bu的参数；2）用于设置MPC的参数
 void Mpc_planner::update_mpc_parameter(float& dt, int& horizon, float& mu, float& f_max, float& dtMPC) {
@@ -157,22 +160,22 @@ void Mpc_planner::run() {
     free(H_red);
     free(g_red);
     free(A_red);
-    free(lb_red);
-    free(ub_red);
+    free(lbA_red);
+    free(ubA_red);
     free(q_red);
   }
 
   H_red = (qpOASES::real_t*)malloc(12 * HORIZON_LENGTH * 12 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
   g_red = (qpOASES::real_t*)malloc(12 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
   A_red = (qpOASES::real_t*)malloc(20 * HORIZON_LENGTH * 12 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
-  lb_red = (qpOASES::real_t*)malloc(20 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
-  ub_red = (qpOASES::real_t*)malloc(20 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
+  lbA_red = (qpOASES::real_t*)malloc(20 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
+  ubA_red = (qpOASES::real_t*)malloc(20 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
   q_red = (qpOASES::real_t*)malloc(12 * HORIZON_LENGTH * sizeof(qpOASES::real_t));
   Eigen2real_t(H_matrix_, H_red, 12 * HORIZON_LENGTH, 12 * HORIZON_LENGTH);
   Eigen2real_t(g_matrix_, g_red, 12 * HORIZON_LENGTH, 1);
   Eigen2real_t(A_matrix_, A_red, 20 * HORIZON_LENGTH, 12 * HORIZON_LENGTH);
-  Eigen2real_t(ubA_matrix_, ub_red, 20 * HORIZON_LENGTH, 1);
-  Eigen2real_t(lbA_matrix_, lb_red, 20 * HORIZON_LENGTH, 1);
+  Eigen2real_t(ubA_matrix_, ubA_red, 20 * HORIZON_LENGTH, 1);
+  Eigen2real_t(lbA_matrix_, lbA_red, 20 * HORIZON_LENGTH, 1);
 
   real_allocated = true;
   qpOASES::QProblem problem_red(new_vars, new_cons);
@@ -183,7 +186,7 @@ void Mpc_planner::run() {
   problem_red.setOptions(op);
   qpOASES::real_t cpu_time{0.01};
   qpOASES::int_t nWSR = 1000;
-  int rval = problem_red.init(H_red, g_red, NULL, NULL, NULL, NULL, NULL, nWSR);
+  int rval = problem_red.init(H_red, g_red, A_red, NULL, NULL, lbA_red, ubA_red, nWSR);
  int rval2 = problem_red.getPrimalSolution(q_red);
     if (rval2 != qpOASES::SUCCESSFUL_RETURN) printf("failed to solve!\n");
 }

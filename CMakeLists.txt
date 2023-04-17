@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 project(liusong_pro)
 include_directories("/usr/include/eigen3")
+include_directories("/usr/local/include/osqp")
 # include_directories("/usr/include/boost")
 set(CMAKE_BUILD_TYPE "Debug")
 
@@ -17,11 +18,12 @@ add_definitions( -std=c++14)
 
 INCLUDE_DIRECTORIES("/usr/local/include")
 # LINK_LIBRARIES("/usr/local/lib/libqpOASES.a")
-add_executable(qp_solver main.cpp Mpc_planner.cpp)
+add_executable(qp_solver_benchmark main.cpp Mpc_planner.cpp)
 
-target_link_libraries(qp_solver
+target_link_libraries(qp_solver_benchmark
   PUBLIC
     qpOASES
+    osqp
 )
 #---------------------------------------------------------------------
 # SET(PINOCCHIO_MODEL_DIR "${PROJECT_SOURCE_DIR}/models")

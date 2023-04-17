@@ -5,6 +5,7 @@
 #include<Eigen/Dense>
 #include<Eigen/Geometry>
 #include "common_data.h"
+#include "osqp.h"
 enum class CoordinateAxis { X, Y, Z };
 #define HORIZON_LENGTH 10
 #define BIG_NUMBER 100000
@@ -18,8 +19,8 @@ public:
  qpOASES::real_t* H_red;
   qpOASES::real_t* g_red;
   qpOASES::real_t* A_red;
-  qpOASES::real_t* lb_red;
-  qpOASES::real_t* ub_red;
+  qpOASES::real_t* lbA_red;
+  qpOASES::real_t* ubA_red;
   qpOASES::real_t* q_red;
   bool real_allocated;
 
