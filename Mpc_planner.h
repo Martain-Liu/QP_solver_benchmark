@@ -1,22 +1,20 @@
 #ifndef MPC_PLANNER_H
 #define MPC_PLANNER_H
-#include "qpOASES.hpp"
-#include<Eigen/Core>
-#include<Eigen/Dense>
-#include<Eigen/Geometry>
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include "common_data.h"
 #include "osqp.h"
+#include "qpOASES.hpp"
 enum class CoordinateAxis { X, Y, Z };
 #define HORIZON_LENGTH 10
 #define BIG_NUMBER 100000
-class Mpc_planner
-{
+class Mpc_planner {
+ public:
+  Mpc_planner();
+  ~Mpc_planner();
 
-public:
-    Mpc_planner();
-    ~Mpc_planner();
-
- qpOASES::real_t* H_red;
+  qpOASES::real_t* H_red;
   qpOASES::real_t* g_red;
   qpOASES::real_t* A_red;
   qpOASES::real_t* lbA_red;
@@ -26,8 +24,7 @@ public:
 
   void init();
   void update_mpc_parameter(float& dt, int& horizon, float& mu, float& f_max, float& dtMPC);
-  void update_dynamic_parameter(
-      const FusionData& fusion_data, const OperatorData& operator_data);
+  void update_dynamic_parameter(const FusionData& fusion_data, const OperatorData& operator_data);
   void update_ABmatrix_parameter(Eigen::Vector3f& inertial, Eigen::Vector3f& com, float mass);
   void update_qpOASES_parameter(Eigen::Matrix<float, 12, 1>& weights, float alpha);
   void run();
@@ -74,7 +71,5 @@ public:
   Eigen::Matrix<float, 20 * HORIZON_LENGTH, 1> lbA_matrix_;
   Eigen::Matrix<float, 20 * HORIZON_LENGTH, 1> ubA_matrix_;
 };
-
-
 
 #endif

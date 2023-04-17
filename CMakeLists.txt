@@ -11,7 +11,7 @@ set(CMAKE_BUILD_TYPE "Debug")
 #aux_source_directory（目录  存放文件列表的变量） 搜索./ls_pro1目录下的所有.cpp文件
 # aux_source_directory(./ls_pro1 CPP_LIST1)
 # add_executable(
-#     out_file1 
+#     out_file1
 #     ${CPP_LIST1}
 # )
 add_definitions( -std=c++14)
@@ -44,7 +44,3 @@ target_link_libraries(qp_solver_benchmark
 # link_libraries用在add_executable之前，target_link_libraries用在add_executable之后
 # link_libraries用来链接静态库，target_link_libraries用来链接导入库，即按照header file + .lib + .dll方式隐式调用动态库的.lib库
 # set(PINO_LIB "${/opt/openrobots/lib}" )
-
-
-
-

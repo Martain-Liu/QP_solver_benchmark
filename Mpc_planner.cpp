@@ -1,50 +1,49 @@
-# include "Mpc_planner.h"
-# include"eigen_types.h"
-#include<iostream>
+#include "Mpc_planner.h"
+
+#include <iostream>
 #include <unsupported/Eigen/MatrixFunctions>
 
-Mpc_planner::Mpc_planner()
-{
-}
+#include "eigen_types.h"
 
-Mpc_planner::~Mpc_planner()
-{
-}
+Mpc_planner::Mpc_planner() {}
+
+Mpc_planner::~Mpc_planner() {}
 
 void Mpc_planner::init() {
-   real_allocated = false; 
-   first_run_ = true;
+  real_allocated = false;
+  first_run_ = true;
 
-   traj_init_.setZero();
-   traj_all_.setZero();
-   x_0_.setZero();
-   root_euler_.setZero();
-   root_position_.setZero();
-   root_angular_velocity_in_world_.setZero();
-   root_linear_velocity_in_world_.setZero();
-   rotation_matrix_body_to_world_.setZero();
-   foot_position_in_body_.setZero();
-   I_body_.setZero();
-   I_world_.setZero();
-   I_world_inv_.setZero();
-   R_yaw_.setZero();
-    A_.setZero();
-   B_.setZero();
-   r_com_to_foot_.setZero();
-   com_in_body_.setZero();
-   A_qp_.setZero();
-   B_qp_.setZero();
+  traj_init_.setZero();
+  traj_all_.setZero();
+  x_0_.setZero();
+  root_euler_.setZero();
+  root_position_.setZero();
+  root_angular_velocity_in_world_.setZero();
+  root_linear_velocity_in_world_.setZero();
+  rotation_matrix_body_to_world_.setZero();
+  foot_position_in_body_.setZero();
+  I_body_.setZero();
+  I_world_.setZero();
+  I_world_inv_.setZero();
+  R_yaw_.setZero();
+  A_.setZero();
+  B_.setZero();
+  r_com_to_foot_.setZero();
+  com_in_body_.setZero();
+  A_qp_.setZero();
+  B_qp_.setZero();
 
-   H_matrix_.setZero();
-   g_matrix_.setZero();
-   A_matrix_.setZero();
-   ubA_matrix_.setZero();
-   lbA_matrix_.setZero();
-   S_.setZero();
-   weights_.setZero();
+  H_matrix_.setZero();
+  g_matrix_.setZero();
+  A_matrix_.setZero();
+  ubA_matrix_.setZero();
+  lbA_matrix_.setZero();
+  S_.setZero();
+  weights_.setZero();
 }
 
-// NOTE：参数传递分为两部分：1）用于构建x_dot = A*x+Bu的参数；2）用于设置MPC的参数
+// NOTE：参数传递分为两部分：1）用于构建x_dot =
+// A*x+Bu的参数；2）用于设置MPC的参数
 void Mpc_planner::update_mpc_parameter(float& dt, int& horizon, float& mu, float& f_max, float& dtMPC) {
   dt_ = dt;
   dtMPC_ = dtMPC;
@@ -53,9 +52,9 @@ void Mpc_planner::update_mpc_parameter(float& dt, int& horizon, float& mu, float
   f_max_ = f_max;
 }
 
-void Mpc_planner::update_dynamic_parameter(
-    const FusionData& fusion_data, const OperatorData& operator_data) {
+void Mpc_planner::update_dynamic_parameter(const FusionData& fusion_data, const OperatorData& operator_data) {
   // NOTE：初始轨迹x_0所需参数
+
   root_euler_ = fusion_data.root_euler;
   root_position_ = fusion_data.root_position;
   root_angular_velocity_in_world_ = fusion_data.root_angular_velocity_in_world;
@@ -132,8 +131,8 @@ void Mpc_planner::run() {
     B_.block<3, 3>(6, 3 * leg) = cross_mat(I_world_inv_, r_com_to_foot_);
     B_.block<3, 3>(9, 3 * leg) = Eigen::Matrix<float, 3, 3>::Identity() / mass_;
   }
-//   std::cout<<"A:\n" <<A_ <<std::endl;
-//   std::cout<<"B:\n" <<B_ <<std::endl;
+  //   std::cout<<"A:\n" <<A_ <<std::endl;
+  //   std::cout<<"B:\n" <<B_ <<std::endl;
   // NOTE：构建A_qp<13*10, 13>，B_qp<13*10, 12*10>矩阵
   Eigen::Matrix<float, 25, 25> ABc, expmm;
   Eigen::Matrix<float, 13, 13> Adt;
@@ -157,13 +156,9 @@ void Mpc_planner::run() {
   powerMats[0].setIdentity();
   for (int i = 1; i < HORIZON_LENGTH + 1; i++) { powerMats[i] = Adt * powerMats[i - 1]; }
   for (int r = 0; r < HORIZON_LENGTH; r++) {
-
     A_qp_.block(13 * r, 0, 13, 13) = powerMats[r + 1];
     for (int n = 0; n < HORIZON_LENGTH; n++) {
-      if (n <= r) { 
-          B_qp_.block(13 * r, 12 * (r - n), 13, 12) = powerMats[n] * Bdt; 
-
-      }
+      if (n <= r) { B_qp_.block(13 * r, 12 * (r - n), 13, 12) = powerMats[n] * Bdt; }
     }
   }
 
@@ -209,14 +204,14 @@ void Mpc_planner::run() {
   qpOASES::QProblem problem_red(new_vars, new_cons);
   qpOASES::Options op;
   op.setToMPC();
-//   op.setToReliable();
+  //   op.setToReliable();
   op.printLevel = qpOASES::PL_LOW;
   problem_red.setOptions(op);
   qpOASES::real_t cpu_time{0.01};
   qpOASES::int_t nWSR = 1000;
   int rval = problem_red.init(H_red, g_red, A_red, NULL, NULL, lbA_red, ubA_red, nWSR);
- int rval2 = problem_red.getPrimalSolution(q_red);
-    if (rval2 != qpOASES::SUCCESSFUL_RETURN) printf("failed to solve!\n");
+  int rval2 = problem_red.getPrimalSolution(q_red);
+  if (rval2 != qpOASES::SUCCESSFUL_RETURN) printf("failed to solve!\n");
 }
 
 void Mpc_planner::get_result() {}
@@ -234,8 +229,9 @@ void Mpc_planner::Eigen2real_t(const Eigen::MatrixBase<Derived>& mat_in, qpOASES
   }
 }
 
-Eigen::Matrix3f  Mpc_planner::coordinateRotation(CoordinateAxis axis, float theta) {
-//   static_assert(std::is_floating_point<T>::value, "must use floating point value");
+Eigen::Matrix3f Mpc_planner::coordinateRotation(CoordinateAxis axis, float theta) {
+  //   static_assert(std::is_floating_point<T>::value, "must use floating point
+  //   value");
   float s = std::sin(theta);
   float c = std::cos(theta);
 
