@@ -1,18 +1,19 @@
-#ifndef MPC_PLANNER_H
-#define MPC_PLANNER_H
+#ifndef MPC_PALNNER_QPOASES_H
+#define MPC_PALNNER_QPOASES_H
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include "OsqpEigen/OsqpEigen.h"
 #include "common_data.h"
 #include "osqp.h"
 #include "qpOASES.hpp"
 enum class CoordinateAxis { X, Y, Z };
 #define HORIZON_LENGTH 10
 #define BIG_NUMBER 100000
-class Mpc_planner {
+class Mpc_planner_qpOASES {
  public:
-  Mpc_planner();
-  ~Mpc_planner();
+  Mpc_planner_qpOASES();
+  ~Mpc_planner_qpOASES();
 
   qpOASES::real_t* H_red;
   qpOASES::real_t* g_red;

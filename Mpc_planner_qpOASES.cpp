@@ -1,15 +1,15 @@
-#include "Mpc_planner.h"
+#include "Mpc_planner_qpOASES.h"
 
 #include <iostream>
 #include <unsupported/Eigen/MatrixFunctions>
 
 #include "eigen_types.h"
 
-Mpc_planner::Mpc_planner() {}
+Mpc_planner_qpOASES::Mpc_planner_qpOASES() {}
 
-Mpc_planner::~Mpc_planner() {}
+Mpc_planner_qpOASES::~Mpc_planner_qpOASES() {}
 
-void Mpc_planner::init() {
+void Mpc_planner_qpOASES::init() {
   real_allocated = false;
   first_run_ = true;
 
@@ -44,7 +44,7 @@ void Mpc_planner::init() {
 
 // NOTE：参数传递分为两部分：1）用于构建x_dot =
 // A*x+Bu的参数；2）用于设置MPC的参数
-void Mpc_planner::update_mpc_parameter(float& dt, int& horizon, float& mu, float& f_max, float& dtMPC) {
+void Mpc_planner_qpOASES::update_mpc_parameter(float& dt, int& horizon, float& mu, float& f_max, float& dtMPC) {
   dt_ = dt;
   dtMPC_ = dtMPC;
   horizon_ = horizon;
@@ -52,7 +52,7 @@ void Mpc_planner::update_mpc_parameter(float& dt, int& horizon, float& mu, float
   f_max_ = f_max;
 }
 
-void Mpc_planner::update_dynamic_parameter(const FusionData& fusion_data, const OperatorData& operator_data) {
+void Mpc_planner_qpOASES::update_dynamic_parameter(const FusionData& fusion_data, const OperatorData& operator_data) {
   // NOTE：初始轨迹x_0所需参数
 
   root_euler_ = fusion_data.root_euler;
@@ -104,7 +104,7 @@ void Mpc_planner::update_dynamic_parameter(const FusionData& fusion_data, const 
   }
 }
 
-void Mpc_planner::update_ABmatrix_parameter(Eigen::Vector3f& inertial, Eigen::Vector3f& com, float mass) {
+void Mpc_planner_qpOASES::update_ABmatrix_parameter(Eigen::Vector3f& inertial, Eigen::Vector3f& com, float mass) {
   I_body_ = inertial;
   mass_ = mass;
   com_in_body_ = com;
@@ -113,14 +113,14 @@ void Mpc_planner::update_ABmatrix_parameter(Eigen::Vector3f& inertial, Eigen::Ve
   I_world_inv_ = I_world_.inverse();
 }
 
-void Mpc_planner::update_qpOASES_parameter(Eigen::Matrix<float, 12, 1>& weights, float alpha) {
+void Mpc_planner_qpOASES::update_qpOASES_parameter(Eigen::Matrix<float, 12, 1>& weights, float alpha) {
   // NOTE : 权重参数
   weights_ << weights, 0.0;
   S_.diagonal() = weights_.replicate<HORIZON_LENGTH, 1>();
   alpha_ = alpha;
 }
 
-void Mpc_planner::run() {
+void Mpc_planner_qpOASES::run() {
   // NOTE:：构建A B矩阵
   A_.block<3, 3>(0, 6) = R_yaw_;
   A_.block<3, 3>(3, 9) = Eigen::Matrix3f::Identity();
@@ -214,22 +214,24 @@ void Mpc_planner::run() {
   if (rval2 != qpOASES::SUCCESSFUL_RETURN) printf("failed to solve!\n");
 }
 
-void Mpc_planner::get_result() {}
+void Mpc_planner_qpOASES::get_result() {}
 
-Eigen::Matrix<float, 3, 3> Mpc_planner::cross_mat(Eigen::Matrix<float, 3, 3> I_inv, Eigen::Matrix<float, 3, 1> r) {
+Eigen::Matrix<float, 3, 3> Mpc_planner_qpOASES::cross_mat(
+    Eigen::Matrix<float, 3, 3> I_inv, Eigen::Matrix<float, 3, 1> r) {
   Eigen::Matrix<float, 3, 3> cm;
   cm << 0.f, -r(2), r(1), r(2), 0.f, -r(0), -r(1), r(0), 0.f;
   return I_inv * cm;
 }
 
 template <typename Derived>
-void Mpc_planner::Eigen2real_t(const Eigen::MatrixBase<Derived>& mat_in, qpOASES::real_t* mat_out, int rows, int cols) {
+void Mpc_planner_qpOASES::Eigen2real_t(
+    const Eigen::MatrixBase<Derived>& mat_in, qpOASES::real_t* mat_out, int rows, int cols) {
   for (int i = 0; i < rows; ++i) {
     for (int j = 0; j < cols; ++j) { mat_out[i * cols + j] = mat_in(i, j); }
   }
 }
 
-Eigen::Matrix3f Mpc_planner::coordinateRotation(CoordinateAxis axis, float theta) {
+Eigen::Matrix3f Mpc_planner_qpOASES::coordinateRotation(CoordinateAxis axis, float theta) {
   //   static_assert(std::is_floating_point<T>::value, "must use floating point
   //   value");
   float s = std::sin(theta);

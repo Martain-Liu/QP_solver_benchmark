@@ -4,7 +4,7 @@
 #include <cmath>
 #include <ctime>
 #include <iostream>
-#include "Mpc_planner.h"
+#include "Mpc_planner_qpOASES.h"
 #include "Timer.h"
 #include "common_data.h"
 
@@ -43,7 +43,7 @@ int main() {
   Eigen::Matrix<float, 12, 1> weights;
   weights << 0.25, 0.25, 10, 2, 2, 50, 0, 0, 0.3, 0.2, 0.2, 0.1;
   float alpha = 1e-5;
-  Mpc_planner planner;
+  Mpc_planner_qpOASES planner;
   planner.init();
   planner.update_mpc_parameter(dt, horizon, mu, f_max, dtMPC);
   planner.update_dynamic_parameter(fusion_data_, operator_data_);
