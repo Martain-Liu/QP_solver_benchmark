@@ -5,7 +5,7 @@
 #include <Eigen/Geometry>
 #include "common_data.h"
 #include "qpOASES.hpp"
-enum class CoordinateAxis { X, Y, Z };
+
 #define HORIZON_LENGTH 10
 #define BIG_NUMBER 100000
 class Mpc_planner_qpOASES {

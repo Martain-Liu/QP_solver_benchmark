@@ -1,4 +1,5 @@
 #include "Mpc_planner_OSQPEigen.h"
+#include <unsupported/Eigen/MatrixFunctions>
 Mpc_planner_OSQPEigen::Mpc_planner_OSQPEigen() {}
 
 Mpc_planner_OSQPEigen::~Mpc_planner_OSQPEigen() {}
@@ -29,6 +30,24 @@ void Mpc_planner_OSQPEigen::init() {
   input_max.setZero();
   input_min.resize(12);
   input_min.setZero();
+
+  traj_init_.setZero();
+  traj_all_.setZero();
+  x_0_.setZero();
+  root_euler_.setZero();
+  root_position_.setZero();
+  root_angular_velocity_in_world_.setZero();
+  root_linear_velocity_in_world_.setZero();
+  rotation_matrix_body_to_world_.setZero();
+  foot_position_in_body_.setZero();
+  I_body_.setZero();
+  I_world_.setZero();
+  I_world_inv_.setZero();
+  R_yaw_.setZero();
+  Adt_.setZero();
+  Bdt_.setZero();
+  r_com_to_foot_.setZero();
+  com_in_body_.setZero();
 }
 
 void Mpc_planner_OSQPEigen::set_solver_parameter(
@@ -37,34 +56,44 @@ void Mpc_planner_OSQPEigen::set_solver_parameter(
     Eigen::Matrix<double, 12, 1>& statemax,
     Eigen::Matrix<double, 12, 1>& statemin,
     Eigen::Matrix<double, 12, 1>& inputmax,
-    Eigen::Matrix<double, 12, 1>& inputmin) {
+    Eigen::Matrix<double, 12, 1>& inputmin,
+    Eigen::Vector3f& inertial,
+    Eigen::Vector3f& com,
+    float dt,
+    float mu,
+    float dtMPC,
+    float mass) {
   // TODO：更新求解器所需参数
   Q_weights << Q, 0.0;
-  R_weights << R, 0.0;
+  R_weights = R;
   state_max << statemax, 0.0;
   state_min << statemin, 0.0;
   input_max = inputmax;
   input_min = inputmin;
+  I_body_ = inertial;
+  mass_ = mass;
+  com_in_body_ = com;
+  dt_ = dt;
+  dtMPC_ = dtMPC;
+  mu_ = mu;
+  I_world_ = R_yaw_ * I_body_.asDiagonal() * R_yaw_.transpose();
+  I_world_inv_ = I_world_.inverse();
 }
 
 void Mpc_planner_OSQPEigen::set_state_parameter(const FusionData& fusion_data, const OperatorData& operator_data) {
   // NOTE：初始轨迹x_0所需参数
-
   root_euler_ = fusion_data.root_euler;
   root_position_ = fusion_data.root_position;
   root_angular_velocity_in_world_ = fusion_data.root_angular_velocity_in_world;
   root_linear_velocity_in_world_ = fusion_data.root_linear_velocity_in_world;
   rotation_matrix_body_to_world_ = fusion_data.rotation_matrix_body_to_world;
   foot_position_in_body_ = fusion_data.foot_position_in_body;
-
   float yc = cos(root_euler_[2]);
   float ys = sin(root_euler_[2]);
   R_yaw_ << yc, -ys, 0, ys, yc, 0, 0, 0, 1;
-
   // NOTE: 初始状态
   x_0_ << fusion_data.root_euler, fusion_data.root_position, fusion_data.root_angular_velocity_in_world,
       fusion_data.root_linear_velocity_in_world, -9.8;
-
   // NOTE：参考轨迹
   float yaw_des;
   float yaw_turn_rate;
@@ -99,11 +128,46 @@ void Mpc_planner_OSQPEigen::set_state_parameter(const FusionData& fusion_data, c
   }
 }
 
+void Mpc_planner_OSQPEigen::set_AB_matrix() {
+  // NOTE:：构建A B矩阵
+  Eigen::Matrix<float, 13, 13> A;
+  Eigen::Matrix<float, 13, 12> B;
+  A.block<3, 3>(0, 6) = R_yaw_;
+  A.block<3, 3>(3, 9) = Eigen::Matrix3f::Identity();
+  A(11, 12) = 1.0;
+
+  for (int leg = 0; leg < 4; leg++) {
+    r_com_to_foot_ = rotation_matrix_body_to_world_ * (foot_position_in_body_.transpose().col(leg) - com_in_body_);
+    B.block<3, 3>(6, 3 * leg) = cross_mat(I_world_inv_, r_com_to_foot_);
+    B.block<3, 3>(9, 3 * leg) = Eigen::Matrix<float, 3, 3>::Identity() / mass_;
+  }
+  Eigen::Matrix<float, 25, 25> ABc, expmm;
+  Eigen::Matrix<float, 12 * HORIZON_LENGTH, 12 * HORIZON_LENGTH> eye12h;
+  Eigen::Matrix<float, 5, 3> f_block;
+  Eigen::Matrix<float, 5, 1> ubA_submatrix;
+  ABc.setZero();
+  eye12h.setIdentity();
+  expmm.setZero();
+  ABc.block<13, 13>(0, 0) = A;
+  ABc.block<13, 12>(0, 13) = B;
+  ABc = dt_ * ABc;
+  expmm = ABc.exp();
+  Adt_ = expmm.block<13, 13>(0, 0);
+  Bdt_ = expmm.block<13, 12>(0, 13);
+}
+
 void Mpc_planner_OSQPEigen::castMPCToQPHessian() {
   // populate hessian matrix
   Q_full_weights = Q_weights.replicate<(HORIZON_LENGTH + 1), 1>();
   R_full_weights = R_weights.replicate<HORIZON_LENGTH, 1>();
-  hessian.diagonal() << Q_full_weights, R_full_weights;
+  // hessian.diagonal() << Q_full_weights, R_full_weights;
+  for (int i = 0; i < 13 * (HORIZON_LENGTH + 1) + 12 * HORIZON_LENGTH; ++i) {
+    if (i < 13 * (HORIZON_LENGTH + 1)) {
+      hessian.insert(i, i) = Q_full_weights(i);
+    } else {
+      hessian.insert(i, i) = R_full_weights(i - 13 * (HORIZON_LENGTH + 1));
+    }
+  }
 }
 
 void Mpc_planner_OSQPEigen::castMPCToQPGradient() {
@@ -113,32 +177,21 @@ void Mpc_planner_OSQPEigen::castMPCToQPGradient() {
 }
 
 void Mpc_planner_OSQPEigen::castMPCToQPConstraintMatrix() {
-  // NOTE:：构建A B矩阵
-  A_.block<3, 3>(0, 6) = R_yaw_;
-  A_.block<3, 3>(3, 9) = Eigen::Matrix3f::Identity();
-  A_(11, 12) = 1.0;
-
-  for (int leg = 0; leg < 4; leg++) {
-    r_com_to_foot_ = rotation_matrix_body_to_world_ * (foot_position_in_body_.transpose().col(leg) - com_in_body_);
-    B_.block<3, 3>(6, 3 * leg) = cross_mat(I_world_inv_, r_com_to_foot_);
-    B_.block<3, 3>(9, 3 * leg) = Eigen::Matrix<float, 3, 3>::Identity() / mass_;
-  }
+  set_AB_matrix();
   for (int i = 0; i < 13 * (HORIZON_LENGTH + 1); ++i) { linearMatrix.insert(i, i) = -1; }
   for (int j = 0; j < (13 * (HORIZON_LENGTH + 1) + 12 * HORIZON_LENGTH); ++j) {
     linearMatrix.insert(13 * (HORIZON_LENGTH + 1) + j, j) = 1;
   }
   for (int m = 0; m < HORIZON_LENGTH; ++m) {
     for (int i = 0; i < 13; ++i) {
-      for (int j = 0; j < 13; ++j) { linearMatrix.insert(13 + 13 * m + i, 13 * m + j) = A_(i, j); }
+      for (int j = 0; j < 13; ++j) { linearMatrix.insert(13 + 13 * m + i, 13 * m + j) = Adt_(i, j); }
     }
-    // linearMatrix.block(13 + 13 * m, 13 * m, 13, 13) = A_; }
-    for (int n = 0; n < HORIZON_LENGTH; ++n) {
-      for (int i = 0; i < 13; ++i) {
-        for (int j = 0; j < 12; ++j) {
-          linearMatrix.insert(13 + 13 * n + i, 13 * (HORIZON_LENGTH + 1) + 12 * n + j) = B_(i, j);
-        }
+  }
+  for (int n = 0; n < HORIZON_LENGTH; ++n) {
+    for (int i = 0; i < 13; ++i) {
+      for (int j = 0; j < 12; ++j) {
+        linearMatrix.insert(13 + 13 * n + i, 13 * (HORIZON_LENGTH + 1) + 12 * n + j) = Bdt_(i, j);
       }
-      // linearMatrix.block(13 + 13 * n, 13 * (HORIZON_LENGTH + 1) + 12 * n, 13, 12) = B_;
     }
   }
 }
@@ -169,9 +222,14 @@ void Mpc_planner_OSQPEigen::castMPCToQPConstraintVectors() {
   upperBound << upper_equality, upper_inequality;
 }
 
+void Mpc_planner_OSQPEigen::updateConstraintVectors(
+    const Eigen::Matrix<float, 13, 1>& x0, Eigen::VectorXd& lowerBound, Eigen::VectorXd& upperBound) {
+  lowerBound.block(0, 0, 13, 1) = -x0.cast<double>();
+  upperBound.block(0, 0, 13, 1) = -x0.cast<double>();
+}
+
 int Mpc_planner_OSQPEigen::run() {
   // TODO：设置求解器 并 solve
-
   // cast the MPC problem as QP problem
   castMPCToQPHessian();
   castMPCToQPGradient();
@@ -183,7 +241,7 @@ int Mpc_planner_OSQPEigen::run() {
   // settings
   // solver.settings()->setVerbosity(false);
   solver.settings()->setWarmStart(true);
-
+  std::cout << "hession size == \t" << hessian.rows() << "\t" << hessian.cols() << std::endl;
   // set the initial data of the QP solver
   solver.data()->setNumberOfVariables(12 * (HORIZON_LENGTH + 1) + 4 * HORIZON_LENGTH);
   solver.data()->setNumberOfConstraints(2 * 12 * (HORIZON_LENGTH + 1) + 4 * HORIZON_LENGTH);
@@ -215,11 +273,11 @@ int Mpc_planner_OSQPEigen::run() {
     auto x0Data = x_0_.data();
 
     // propagate the model
-    x_0_ = A_ * x_0_ + B_ * ctr.cast<float>();
+    x_0_ = Adt_ * x_0_ + Bdt_ * ctr.cast<float>();
 
     // update the constraint bound
-    // updateConstraintVectors(x_0_, lowerBound, upperBound);
-    // if (!solver.updateBounds(lowerBound, upperBound)) return 1;
+    updateConstraintVectors(x_0_, lowerBound, upperBound);
+    if (!solver.updateBounds(lowerBound, upperBound)) return 1;
   }
 }
 

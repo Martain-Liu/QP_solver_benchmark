@@ -5,7 +5,7 @@
 #include <Eigen/Geometry>
 #include "OsqpEigen/OsqpEigen.h"
 #include "common_data.h"
-enum class CoordinateAxis { X, Y, Z };
+
 #define HORIZON_LENGTH 10
 class Mpc_planner_OSQPEigen {
  public:
@@ -21,14 +21,23 @@ class Mpc_planner_OSQPEigen {
       Eigen::Matrix<double, 12, 1>& statemax,
       Eigen::Matrix<double, 12, 1>& statemin,
       Eigen::Matrix<double, 12, 1>& inputmax,
-      Eigen::Matrix<double, 12, 1>& inputmin);
+      Eigen::Matrix<double, 12, 1>& inputmin,
+      Eigen::Vector3f& inertial,
+      Eigen::Vector3f& com,
+      float dt,
+      float mu,
+      float dtMPC,
+      float mass);
   int run();
+  void set_AB_matrix();
   void castMPCToQPHessian();
   void castMPCToQPGradient();
   void castMPCToQPConstraintMatrix();
   void castMPCToQPConstraintVectors();
   Eigen::Matrix3f coordinateRotation(CoordinateAxis axis, double theta);
   Eigen::Matrix<float, 3, 3> cross_mat(Eigen::Matrix<float, 3, 3> I_inv, Eigen::Matrix<float, 3, 1> r);
+  void updateConstraintVectors(
+      const Eigen::Matrix<float, 13, 1>& x0, Eigen::VectorXd& lowerBound, Eigen::VectorXd& upperBound);
 
   int state_optim_nums;
   int input_optim_nums;
@@ -48,7 +57,7 @@ class Mpc_planner_OSQPEigen {
 
  private:
   Eigen::Matrix<float, 12, 1> traj_init_;
-  Eigen::Matrix<float, 13 * HORIZON_LENGTH, 1> traj_all_;
+  Eigen::Matrix<float, 13 * (HORIZON_LENGTH + 1), 1> traj_all_;
   Eigen::Matrix<float, 13, 1> x_0_;
   Eigen::Vector3f root_euler_;
   Eigen::Vector3f root_position_;
@@ -60,8 +69,8 @@ class Mpc_planner_OSQPEigen {
   Eigen::Matrix3f I_world_;
   Eigen::Matrix3f I_world_inv_;
   Eigen::Matrix3f R_yaw_;
-  Eigen::Matrix<float, 13, 13> A_;
-  Eigen::Matrix<float, 13, 12> B_;
+  Eigen::Matrix<float, 13, 13> Adt_;
+  Eigen::Matrix<float, 13, 12> Bdt_;
   Eigen::Vector3f r_com_to_foot_;
   Eigen::Vector3f com_in_body_;
   float mass_;

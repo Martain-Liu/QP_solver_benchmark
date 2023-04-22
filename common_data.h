@@ -1,7 +1,7 @@
 #ifndef COMMON_DATA_H_
 #define COMMON_DATA_H_
-#include"eigen_types.h"
-
+#include "eigen_types.h"
+enum class CoordinateAxis { X, Y, Z };
 struct FusionData {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
