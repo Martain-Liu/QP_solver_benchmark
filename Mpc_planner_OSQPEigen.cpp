@@ -163,9 +163,11 @@ void Mpc_planner_OSQPEigen::castMPCToQPHessian() {
   // hessian.diagonal() << Q_full_weights, R_full_weights;
   for (int i = 0; i < 13 * (HORIZON_LENGTH + 1) + 12 * HORIZON_LENGTH; ++i) {
     if (i < 13 * (HORIZON_LENGTH + 1)) {
-      hessian.insert(i, i) = Q_full_weights(i);
+      double Q_values = Q_full_weights(i, 0);
+      if (Q_values != 0) hessian.insert(i, i) = Q_values;
     } else {
-      hessian.insert(i, i) = R_full_weights(i - 13 * (HORIZON_LENGTH + 1));
+      double R_values = R_full_weights(i - 13 * (HORIZON_LENGTH + 1), 0);
+      if (R_values != 0) hessian.insert(i, i) = R_values;
     }
   }
 }
@@ -241,10 +243,9 @@ int Mpc_planner_OSQPEigen::run() {
   // settings
   // solver.settings()->setVerbosity(false);
   solver.settings()->setWarmStart(true);
-  std::cout << "hession size == \t" << hessian.rows() << "\t" << hessian.cols() << std::endl;
   // set the initial data of the QP solver
-  solver.data()->setNumberOfVariables(12 * (HORIZON_LENGTH + 1) + 4 * HORIZON_LENGTH);
-  solver.data()->setNumberOfConstraints(2 * 12 * (HORIZON_LENGTH + 1) + 4 * HORIZON_LENGTH);
+  solver.data()->setNumberOfVariables(13 * (HORIZON_LENGTH + 1) + 12 * HORIZON_LENGTH);
+  solver.data()->setNumberOfConstraints(2 * 13 * (HORIZON_LENGTH + 1) + 12 * HORIZON_LENGTH);
   if (!solver.data()->setHessianMatrix(hessian)) return 1;
   if (!solver.data()->setGradient(gradient)) return 1;
   if (!solver.data()->setLinearConstraintsMatrix(linearMatrix)) return 1;
@@ -278,6 +279,7 @@ int Mpc_planner_OSQPEigen::run() {
     // update the constraint bound
     updateConstraintVectors(x_0_, lowerBound, upperBound);
     if (!solver.updateBounds(lowerBound, upperBound)) return 1;
+    std::cout << "--------------------END--------------------------" << std::endl;
   }
 }
 
